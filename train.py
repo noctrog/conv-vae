@@ -13,16 +13,12 @@ import argparse
 
 import model
 
-def unnormalize_img(img):
-    img = img / 2 + 0.5
-    return img
-
-
 def kl_loss(mu, log_var):
-    return -0.5 * torch.sum(1 + log_var - mu ** 2 - torch.exp(log_var), dim=1)
+    # TODO: dividir entre el numero de batches? 
+    return -0.5 * torch.sum(1 + log_var - mu ** 2 - torch.exp(log_var)) #/ mu.size()[0]
 
 def r_loss(y_train, y_pred):
-    r_loss = torch.mean((y_train - y_pred) ** 2, dim=(1,2,3))
+    r_loss = torch.mean((y_train - y_pred) ** 2)
     return r_loss
 
 def main():
@@ -33,9 +29,9 @@ def main():
     parser.add_argument("--visual_every", default=200, type=int, help='Display faces every n batches')
     parser.add_argument("--z_dim", type=int, default=200, help='Dimensions of latent space')
     parser.add_argument("--r_loss_factor", type=float, default=10000.0, help='r_loss factor')
-    parser.add_argument("--lr", default=0.002, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.002, help='Learning rate')
     parser.add_argument("--batch_size", default=32, type=int, help='Batch size')
-    parser.add_argument("--load", type=str, help='Load pretrained weights')
+    parser.add_argument("--load", type=str, default='', help='Load pretrained weights')
     args = parser.parse_args()
 
     # data where the images are located
@@ -53,12 +49,14 @@ def main():
 
     # prepare data
     train_transforms = transforms.Compose([
+        transforms.Resize((176, 144)),
         transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
 
     train_data = datasets.ImageFolder(data_dir, transform=train_transforms)
     trainloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True)
+
+    images, labels = next(iter(trainloader))
 
     # create model
     input_shape = next(iter(trainloader))[0].shape
@@ -67,13 +65,13 @@ def main():
 
     # load previous weights (if any)
     if args.load is not '':
-        vae.load_state_dict(torh.load(args.load))
+        vae.load_state_dict(torch.load(args.load))
         print("Weights loaded: {}".format(args.load))
 
     # create tensorboard writer
     writer = SummaryWriter(comment='-' + 'VAE' + str(args.z_dim))
 
-    optimizer = optim.Adam(vae.parameters(), lr=0.002)
+    optimizer = optim.Adam(vae.parameters(), lr=args.lr)
 
     # generate random points in latent space so we can see how the network is training
     latent_space_test_points = np.random.normal(scale=1.0, size=(6, args.z_dim))
@@ -92,8 +90,6 @@ def main():
             mu_v, log_var_v, images_out_v = vae(images_v)
             r_loss_v = r_loss(images_out_v, images_v)
             kl_loss_v = kl_loss(mu_v, log_var_v)
-            print(r_loss_v.size())
-            print(kl_loss_v.size())
             loss = kl_loss_v + r_loss_v * args.r_loss_factor
             loss.backward()
             optimizer.step()
@@ -103,7 +99,7 @@ def main():
             if batch_iterations % args.visual_every == 0:
                 # print loss
                 print("Batch: {}\tLoss: {}".format(batch_iterations + e * len(trainloader) / args.batch_size, loss.item()))
-                writer.add_scalar('loss', loss.item(), batch_iterations)
+                writer.add_scalar('loss', np.mean(epoch_loss[-args.visual_every:]), batch_iterations)
 
 
             batch_iterations = batch_iterations + 1
@@ -111,18 +107,19 @@ def main():
         else:
             training_losses.append(np.mean(epoch_loss))
             if min(training_losses) == training_losses[-1]:
-                torch.save(vae.state_dict(), 'vae_weights-' + str(args.z_dim) + '.dat')
+                # torch.save(vae.state_dict(), 'vae_weights-' + str(args.z_dim) + '.dat')
+                vae.save('vae-' + str(args.z_dim) + '.dat')
 
             vae.eval()
 
             generated_imgs_v = vae.forward_decoder(latent_space_test_points_v)
 
-            writer.add_image('preview-1', unnormalize_img(generated_imgs_v[0].detach().cpu().numpy()), batch_iterations)
-            writer.add_image('preview-2', unnormalize_img(generated_imgs_v[1].detach().cpu().numpy()), batch_iterations)
-            writer.add_image('preview-3', unnormalize_img(generated_imgs_v[2].detach().cpu().numpy()), batch_iterations)
-            writer.add_image('preview-4', unnormalize_img(generated_imgs_v[3].detach().cpu().numpy()), batch_iterations)
-            writer.add_image('preview-5', unnormalize_img(generated_imgs_v[4].detach().cpu().numpy()), batch_iterations)
-            writer.add_image('preview-6', unnormalize_img(generated_imgs_v[5].detach().cpu().numpy()), batch_iterations)
+            writer.add_image('preview-1', generated_imgs_v[0].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-2', generated_imgs_v[1].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-3', generated_imgs_v[2].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-4', generated_imgs_v[3].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-5', generated_imgs_v[4].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-6', generated_imgs_v[5].detach().cpu().numpy(), batch_iterations)
 
             vae.train()
 

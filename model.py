@@ -10,6 +10,7 @@ class VAE(nn.Module):
         super().__init__()
 
         self.z_dim = z_dim
+        self.input_shape = input_shape
 
         # encoder
         self.encoder_conv = nn.Sequential(
@@ -44,19 +45,35 @@ class VAE(nn.Module):
             nn.LeakyReLU(),
             nn.Dropout(0.2)
         )
+        # self.decoder_conv = nn.Sequential(
+            # nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),
+            # nn.BatchNorm2d(64),
+            # nn.LeakyReLU(),
+            # nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),
+            # nn.BatchNorm2d(64),
+            # nn.LeakyReLU(),
+            # nn.ConvTranspose2d(64, 32, 2, stride=2, padding=0),
+            # nn.BatchNorm2d(32),
+            # nn.LeakyReLU(),
+            # nn.ConvTranspose2d(32, 3, 2, stride=2, padding=0),
+            # nn.Sigmoid()
+        # )
         self.decoder_conv = nn.Sequential(
-            nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(),
-            nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(),
-            nn.ConvTranspose2d(64, 32, 2, stride=2, padding=0),
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.ConvTranspose2d(64, 32, 3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.LeakyReLU(),
-            nn.ConvTranspose2d(32, 3, 2, stride=2, padding=0),
-            nn.BatchNorm2d(3),
-            nn.LeakyReLU(),
+            nn.UpsamplingNearest2d(scale_factor=2),
+            nn.ConvTranspose2d(32, 3, 3, stride=1, padding=1),
+            nn.Sigmoid()
         )
 
     def sampling(self, mu, log_var):
@@ -88,3 +105,14 @@ class VAE(nn.Module):
         self.conv_out_shape = out.size()
         return int(np.prod(self.conv_out_shape))
 
+    def save(self, where):
+        dump = {'z_dim': self.z_dim,
+                'input_shape': self.input_shape,
+                'state_dict': self.state_dict}
+        torch.save(dump, where)
+
+    def forward_no_epsilon(self, x):
+        mu_p, log_var_p = self.forward_encoder(x)
+        x = mu_p
+        images_p = self.forward_decoder(x)
+        return images_p
