@@ -6,7 +6,7 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, utils
 from tensorboardX import SummaryWriter
 
 import argparse
@@ -65,7 +65,7 @@ def main():
 
     # load previous weights (if any)
     if args.load is not '':
-        vae.load_state_dict(torch.load(args.load))
+        vae.load_state_dict(torch.load(args.load)['state_dict'])
         print("Weights loaded: {}".format(args.load))
 
     # create tensorboard writer
@@ -74,7 +74,7 @@ def main():
     optimizer = optim.Adam(vae.parameters(), lr=args.lr)
 
     # generate random points in latent space so we can see how the network is training
-    latent_space_test_points = np.random.normal(scale=1.0, size=(6, args.z_dim))
+    latent_space_test_points = np.random.normal(scale=1.0, size=(16, args.z_dim))
     latent_space_test_points_v = torch.Tensor(latent_space_test_points).to(device)
 
     batch_iterations = 0
@@ -107,19 +107,14 @@ def main():
         else:
             training_losses.append(np.mean(epoch_loss))
             if min(training_losses) == training_losses[-1]:
-                # torch.save(vae.state_dict(), 'vae_weights-' + str(args.z_dim) + '.dat')
                 vae.save('vae-' + str(args.z_dim) + '.dat')
 
             vae.eval()
 
-            generated_imgs_v = vae.forward_decoder(latent_space_test_points_v)
+            generated_imgs_v = vae.forward_decoder(latent_space_test_points_v).detach()
+            imgs_grid = utils.make_grid(generated_imgs_v)
 
-            writer.add_image('preview-1', generated_imgs_v[0].detach().cpu().numpy(), batch_iterations)
-            writer.add_image('preview-2', generated_imgs_v[1].detach().cpu().numpy(), batch_iterations)
-            writer.add_image('preview-3', generated_imgs_v[2].detach().cpu().numpy(), batch_iterations)
-            writer.add_image('preview-4', generated_imgs_v[3].detach().cpu().numpy(), batch_iterations)
-            writer.add_image('preview-5', generated_imgs_v[4].detach().cpu().numpy(), batch_iterations)
-            writer.add_image('preview-6', generated_imgs_v[5].detach().cpu().numpy(), batch_iterations)
+            writer.add_image('preview-1', imgs_grid.cpu().numpy(), batch_iterations)
 
             vae.train()
 

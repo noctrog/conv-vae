@@ -108,7 +108,7 @@ class VAE(nn.Module):
     def save(self, where):
         dump = {'z_dim': self.z_dim,
                 'input_shape': self.input_shape,
-                'state_dict': self.state_dict}
+                'state_dict': self.state_dict()}
         torch.save(dump, where)
 
     def forward_no_epsilon(self, x):
