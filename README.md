@@ -7,8 +7,11 @@ trained for nearly 90 epochs.
 
 ## Results
 
+### Face transitions
 ![media/transition1.gif](media/transition1.gif)
 ![media/transition2.gif](media/transition2.gif)
+
+### Mean face between two samples
 ![media/mean_face.png](media/mean_face.png)
 
 
