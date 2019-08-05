@@ -78,7 +78,7 @@ class VAE(nn.Module):
 
     def sampling(self, mu, log_var):
         ## TODO: epsilon should be at the model's device (not CUDA)
-        epsilon = torch.Tensor(np.random.normal(size=(self.z_dim))).cuda()
+        epsilon = torch.Tensor(np.random.normal(size=(self.z_dim), scale=1.0)).cuda()
         return mu + epsilon * torch.exp(log_var / 2)
 
     def forward_encoder(self, x):

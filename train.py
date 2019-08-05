@@ -15,7 +15,7 @@ import model
 
 def kl_loss(mu, log_var):
     # TODO: dividir entre el numero de batches? 
-    return -0.5 * torch.sum(1 + log_var - mu ** 2 - torch.exp(log_var)) #/ mu.size()[0]
+    return -0.5 * torch.mean(1 + log_var - mu.pow(2) - torch.exp(log_var))
 
 def r_loss(y_train, y_pred):
     r_loss = torch.mean((y_train - y_pred) ** 2)
@@ -49,7 +49,8 @@ def main():
 
     # prepare data
     train_transforms = transforms.Compose([
-        transforms.Resize((176, 144)),
+        # transforms.Resize((176, 144)),
+        transforms.Resize((128, 112)),
         transforms.ToTensor(),
     ])
 
